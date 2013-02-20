@@ -1,0 +1,45 @@
+Name:           hscope
+Version:        0.1
+License:        BSD3
+License-File:   COPYING
+Category:       source-tools
+Synopsis:       cscope like browser for Haskell code
+Description:
+    hscope is a partial cscope line oriented mode reimplementation for Haskell code.
+
+    See hscope --help for available options.
+
+    Being cscope-compatible gives Vim integration for free. Use :set cscopeprg=<path to hscope>
+    to configure hscope as cscope replacement for haskell files.
+
+Cabal-Version:  >= 1.10
+Build-Type:     Simple
+Author:         Boris Sukholitko <boriss@gmail.com>
+Copyright:      Boris Sukholitko <boriss@gmail.com>
+Maintainer:     Boris Sukholitko <boriss@gmail.com>
+Stability:      Experimental
+Extra-Source-Files:
+    t/files/Arrow.hs
+    t/files/a/c.h
+    t/files/a/a.h
+    t/files/b/b.h
+    t/files/CPP2.hs
+    t/files/garrs.hs
+    t/files/Simple.hs
+    t/files/CPP.hs
+    t/files/a.c
+
+Executable hscope
+    Main-Is: HScope.hs
+    GHC-Options: -Wall
+    Build-Depends: base, hs-cdb, haskell-src-exts, mtl, uniplate, cereal, vector, bytestring, process
+    Default-Language: Haskell2010
+
+test-suite Build
+    type:            exitcode-stdio-1.0
+    build-depends:   base, test-simple, process, directory, Unixutils, mtl
+    ghc-options:     -Wall
+    hs-source-dirs:  t
+    main-is:         Build.hs
+    Default-Language: Haskell2010
+
