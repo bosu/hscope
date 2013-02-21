@@ -7,9 +7,12 @@ Synopsis:       cscope like browser for Haskell code
 Description:
     hscope is a partial cscope line oriented mode reimplementation for Haskell code.
 
+    Currently it supports finding the definition and callers of the function, types.
+    Also works searching for files and in files.
+    
     See hscope --help for available options.
 
-    Being cscope-compatible gives Vim integration for free. Use :set cscopeprg=<path to hscope>
+    Being cscope-compatible gives Vim integration for free. Use :set cscopeprg
     to configure hscope as cscope replacement for haskell files.
 
 Cabal-Version:  >= 1.10
