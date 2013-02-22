@@ -18,6 +18,7 @@ import qualified Data.Vector as V
 import Control.Applicative ((<$>), (<*>))
 import System.IO (hFlush, stdout)
 import Data.Generics.Uniplate.Data (transformBiM)
+import System.Directory (doesFileExist)
 import Data.Data
 
 data Flag = Build Bool | File FilePath | Line | Query String | CPPInclude String deriving (Show)
@@ -183,12 +184,17 @@ main :: IO ()
 main = do
     (flags, rest, _) <- fmap (getOpt Permute options) getArgs
     let cfg = parseFlags flags
-    when (cBuild cfg) $ cdbMake (cFile cfg) $ mapM_ (buildOne cfg) rest
+    when (cBuild cfg) $ do
+        if null rest then putStrLn $ "Please provide files to build the hscope database"
+                     else cdbMake (cFile cfg) $ mapM_ (buildOne cfg) rest
     if null flags then usage else go cfg
     where usage = do
             pn <- getProgName
             putStrLn $ usageInfo ("Usage: " ++ pn ++ " [OPTION...] files...") options
           go cfg = do
-            cdb <- cdbInit $ cFile cfg
-            maybe (return ()) (handleQuery cdb) $ cQuery cfg
-            when (cLine cfg) $ runLines cdb
+            b <- doesFileExist $ cFile cfg
+            if b then do
+                    cdb <- cdbInit $ cFile cfg
+                    maybe (return ()) (handleQuery cdb) $ cQuery cfg
+                    when (cLine cfg) $ runLines cdb
+                 else putStrLn $ cFile cfg ++ " does not exist"
