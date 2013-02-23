@@ -1,5 +1,5 @@
 Name:           hscope
-Version:        0.1.1
+Version:        0.1.2
 License:        BSD3
 License-File:   COPYING
 Category:       source-tools
@@ -24,6 +24,7 @@ homepage:       https://github.com/bosu/hscope
 Stability:      Experimental
 Extra-Source-Files:
     t/files/Arrow.hs
+    t/files/Fixity.hs
     t/files/a/c.h
     t/files/a/a.h
     t/files/b/b.h

@@ -127,7 +127,7 @@ parseCurrentFile f fstr = go [] where
                 in if rest == " is not enabled"
                    then go ((classifyExtension ext):exts)
                    else Left $ str ++ " for " ++ f ++ " at " ++ show src
-    pmode exts = defaultParseMode { fixities = Just baseFixities
+    pmode exts = defaultParseMode { fixities = Just []
                             , extensions = exts
                             , parseFilename = f }
 
