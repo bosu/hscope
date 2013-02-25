@@ -127,16 +127,15 @@ preprocess idirs f = do
           cmnt x = x
           incs = concatMap (\i -> [ "-I", i ]) idirs
 
-parseCurrentFile :: FilePath -> String -> Either String (Module SrcSpanInfo)
-parseCurrentFile f fstr = go [] where
-    go exts = case parseFileContentsWithMode (pmode exts) fstr of
+parseCurrentFile :: FilePath -> String -> [Extension] -> Either String (Module SrcSpanInfo)
+parseCurrentFile f fstr exts = case parseFileContentsWithMode (pmode exts) fstr of
         ParseOk m -> Right m
         ParseFailed src str -> let (ext, rest) = break (== ' ') str
                 in if rest == " is not enabled"
-                   then go ((classifyExtension ext):exts)
-                   else Left $ str ++ " for " ++ f ++ " at " ++ show src
-    pmode exts = defaultParseMode { fixities = Just []
-                            , extensions = exts
+                   then parseCurrentFile f fstr ((classifyExtension ext):exts)
+                   else Left $ str ++ " for " ++ f ++ " at " ++ show src ++ " with " ++ show exts
+    where pmode exs = defaultParseMode { fixities = Just []
+                            , extensions = exs
                             , parseFilename = f }
 
 buildOne :: Config -> FilePath -> CDBMake
@@ -144,6 +143,7 @@ buildOne cfg f = do
     cdbAdd "0_hs_files" f
     (fstr, lns) <- liftIO $ preprocess (cCPPIncludes cfg) f
     either (liftIO . putStrLn) (go lns) $ parseCurrentFile f fstr
+        $ map classifyExtension $ cExtensions cfg
     where go lns modul = do
                     traverseAST (handleDefinitions lns) modul
                     traverseAST (handleCalls lns) modul
