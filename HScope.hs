@@ -21,10 +21,12 @@ import Data.Generics.Uniplate.Data (transformBiM)
 import System.Directory (doesFileExist)
 import Data.Data
 
-data Flag = Build Bool | File FilePath | Line | Query String | CPPInclude String deriving (Show)
+data Flag = Build Bool | File FilePath | Line | Query String
+                | CPPInclude String | OExtension String deriving (Show)
 
 data Config = Config { cBuild :: Bool, cFile :: FilePath, cLine :: Bool
-                        , cQuery :: Maybe String, cCPPIncludes :: [String] } deriving Show
+                        , cQuery :: Maybe String, cCPPIncludes :: [String]
+                        , cExtensions :: [String] } deriving Show
 
 data IType = Definition | Call deriving (Enum, Show, Eq)
 data Info = Info IType String Int B.ByteString deriving Show
@@ -53,20 +55,26 @@ options = [
             , Option ['f'] [ "file" ] (ReqArg File "REFFILE") $
                 "Use REFFILE as the cross-reference file name instead of the default"
                     ++ " \"hscope.out\""
-            , Option ['1'] [ "definition" ] (ReqArg (Query . ('1':)) "SYMBOL") $ "Find the definition of the SYMBOL"
-            , Option ['3'] [ "callers" ] (ReqArg (Query . ('3':)) "SYMBOL") $ "Find SYMBOLs calling this SYMBOL"
+            , Option ['1'] [ "definition" ] (ReqArg (Query . ('1':)) "SYMBOL")
+                    $ "Find the definition of the SYMBOL"
+            , Option ['3'] [ "callers" ] (ReqArg (Query . ('3':)) "SYMBOL")
+                    $ "Find SYMBOLs calling this SYMBOL"
             , Option ['4'] [ "text" ] (ReqArg (Query . ('4':)) "TEXT") $ "Find TEXT in files"
-            , Option ['7'] [ "file" ] (ReqArg (Query . ('7':)) "FILE") $ "Find files matching FILE"
-            , Option ['I'] [ "cpp-include" ] (ReqArg CPPInclude "DIRECTORY") $ "Include path for CPP preprocessor"
+            , Option ['7'] [ "file" ] (ReqArg (Query . ('7':)) "FILE")
+                    $ "Find files matching FILE"
+            , Option ['I'] [ "cpp-include" ] (ReqArg CPPInclude "DIRECTORY")
+                    $ "Include path for CPP preprocessor"
+            , Option ['X'] [ "extension" ] (ReqArg OExtension "EXTENSION") $ "Add GHC extension"
           ]
 
 parseFlags :: [Flag] -> Config
-parseFlags = foldl' go $ Config False "hscope.out" False Nothing [] where
+parseFlags = foldl' go $ Config False "hscope.out" False Nothing [] [] where
     go c (Build b) = c { cBuild = b }
     go c (File f) = c { cFile = f }
     go c Line = c { cLine = True }
     go c (Query q) = c { cQuery = Just q }
     go c (CPPInclude i) = c { cCPPIncludes = i:(cCPPIncludes c) }
+    go c (OExtension i) = c { cExtensions = i:(cExtensions c) }
 
 addInfo :: Lines -> IType -> Name SrcSpanInfo -> CDBMake
 addInfo vec ity n = cdbAdd f $ encode $ Info ity (fileName src) (fst lp) (snd lp)
