@@ -38,7 +38,7 @@ Executable hscope
     Main-Is: HScope.hs
     GHC-Options: -Wall
     Build-Depends: base (< 5), hs-cdb, haskell-src-exts, mtl, uniplate, cereal
-                             , vector, bytestring, process, directory
+                             , vector, bytestring, process, directory, cpphs
     Default-Language: Haskell2010
 
 test-suite Build
