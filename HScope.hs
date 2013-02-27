@@ -20,7 +20,7 @@ import System.IO (hFlush, stdout)
 import Data.Generics.Uniplate.Data (transformBiM)
 import System.Directory (doesFileExist)
 import Data.Data
-import Language.Preprocessor.Cpphs (runCpphs, defaultCpphsOptions)
+import Language.Preprocessor.Cpphs (runCpphs, defaultCpphsOptions,  CpphsOptions(..))
 
 data Flag = Build Bool | File FilePath | Line | Query String
                 | CPPInclude String | OExtension String deriving (Show)
@@ -121,13 +121,14 @@ mapLines f to = reverse . snd . foldl' go ((to, True), []) where
 preprocess :: [String] -> FilePath -> IO (String, Lines)
 preprocess idirs f = do
     rf <- B.readFile f
-    (runCpphs defaultCpphsOptions f $ B.unpack rf) -- >>= putStrLn
+    (runCpphs cpphsOpts f $ B.unpack rf) >>= putStrLn
     flns <- fmap lines $ readProcess "cpp" (incs ++ [ "-traditional-cpp", f ]) ""
     return (fconts flns, V.fromList $ mapLines f (zip [1 ..] $ B.lines rf) flns)
     where fconts = intercalate "\n" . map cmnt
           cmnt ('#':_) = ""
           cmnt x = x
           incs = concatMap (\i -> [ "-I", i ]) idirs
+          cpphsOpts = defaultCpphsOptions { includes = idirs }
 
 parseCurrentFile :: FilePath -> String -> [Extension] -> Either String (Module SrcSpanInfo)
 parseCurrentFile f fstr exts = case parseFileContentsWithMode (pmode exts) fstr of
