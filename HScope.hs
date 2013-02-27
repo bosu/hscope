@@ -80,7 +80,7 @@ parseFlags = foldl' go $ Config False "hscope.out" False Nothing [] [] where
 addInfo :: Lines -> IType -> Name SrcSpanInfo -> CDBMake
 addInfo vec ity n = cdbAdd f $ encode $ Info ity (fileName src) (fst lp) (snd lp)
     where l = startLine src
-          lp = maybe (error $ "Bad line: " ++ show n ++ ", " ++ show vec) id $ vec V.!? (l - 1)
+          lp = maybe (error $ "Bad line: " ++ show n ++ ", " ++ show vec) id $ vec V.!? (l - 2)
           (src, f) = case n of
             (Ident src' f') -> (src', f')
             (Symbol src' f') -> (src', f')
@@ -113,21 +113,19 @@ handleDeclarations _ c = error $ "handleDeclarations " ++ show c
 
 mapLines :: Show a => FilePath -> [a] -> [String] -> [a]
 mapLines f to = reverse . snd . foldl' go ((to, True), []) where
-    go ((xs@(x:_), _), res) ('#':str) = ((xs, isInfixOf f str), x:res)
-    go (((x:xs), True), res) _ = ((xs, True), x:res)
-    go ((xs@(x:_), False), res) _ = ((xs, False), x:res)
-    go t l = error $ "mapLines: " ++ show t ++ " at " ++ l
+    go t ('#':str) = let ((xs, _), res) = ret t in ((xs, isInfixOf f str), res)
+    go t _ = ret t
+    ret ((a@(x:xs), b), res) = ((if b then xs else a, b), x:res)
+    ret t = t
 
 preprocess :: [String] -> FilePath -> IO (String, Lines)
 preprocess idirs f = do
     rf <- B.readFile f
-    (runCpphs cpphsOpts f $ B.unpack rf) >>= putStrLn
-    flns <- fmap lines $ readProcess "cpp" (incs ++ [ "-traditional-cpp", f ]) ""
+    flns <- fmap lines $ runCpphs cpphsOpts f $ B.unpack rf
     return (fconts flns, V.fromList $ mapLines f (zip [1 ..] $ B.lines rf) flns)
     where fconts = intercalate "\n" . map cmnt
           cmnt ('#':_) = ""
           cmnt x = x
-          incs = concatMap (\i -> [ "-I", i ]) idirs
           cpphsOpts = defaultCpphsOptions { includes = idirs }
 
 parseCurrentFile :: FilePath -> String -> [Extension] -> Either String (Module SrcSpanInfo)
