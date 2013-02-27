@@ -138,7 +138,7 @@ main = withTemporaryDirectory "/tmp/hscope_test_XXXXXX" $ \td -> testSimpleMain 
     like res19 "0 ==>"
 
     res20 <- liftIO $ readProcess hpath [ "--build", "-f", td ++ "/foo.out"
-                            , "-X", "UnboxedTuples", "t/files/Unbox.hs" ] ""
+                            , "-X", "MagicHash", "t/files/Unbox.hs" ] ""
     is res20 $ ""
 
     return ()
