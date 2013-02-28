@@ -128,7 +128,7 @@ preprocess idirs f = do
           cmnt ('#':_) = ""
           cmnt x = x
           cpphsOpts = defaultCpphsOptions { includes = idirs, boolopts = bools }
-          bools = defaultBoolOptions { stripC89 = True }
+          bools = defaultBoolOptions { stripC89 = True, stripEol = True }
 
 parseCurrentFile :: FilePath -> String -> [Extension] -> Either String (Module SrcSpanInfo)
 parseCurrentFile f fstr exts = case parseFileContentsWithMode (pmode exts) fstr of
