@@ -20,7 +20,8 @@ import System.IO (hFlush, stdout)
 import Data.Generics.Uniplate.Data (transformBiM)
 import System.Directory (doesFileExist)
 import Data.Data
-import Language.Preprocessor.Cpphs (runCpphs, defaultCpphsOptions,  CpphsOptions(..))
+import Language.Preprocessor.Cpphs (runCpphs, defaultCpphsOptions,  CpphsOptions(..)
+            , defaultBoolOptions, BoolOptions(..))
 
 data Flag = Build Bool | File FilePath | Line | Query String
                 | CPPInclude String | OExtension String deriving (Show)
@@ -126,7 +127,8 @@ preprocess idirs f = do
     where fconts = intercalate "\n" . map cmnt
           cmnt ('#':_) = ""
           cmnt x = x
-          cpphsOpts = defaultCpphsOptions { includes = idirs }
+          cpphsOpts = defaultCpphsOptions { includes = idirs, boolopts = bools }
+          bools = defaultBoolOptions { stripC89 = True }
 
 parseCurrentFile :: FilePath -> String -> [Extension] -> Either String (Module SrcSpanInfo)
 parseCurrentFile f fstr exts = case parseFileContentsWithMode (pmode exts) fstr of
