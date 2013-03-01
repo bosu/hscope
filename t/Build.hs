@@ -23,7 +23,7 @@ hscopeInteract hpath td cmds = do
 
 main :: IO ()
 main = withTemporaryDirectory "/tmp/hscope_test_XXXXXX" $ \td -> testSimpleMain $ do
-    plan 47
+    plan 48
     hpath <- liftIO $ canonicalizePath "./dist/build/hscope/hscope"
     tfile <- liftIO $ canonicalizePath "./t/files/Simple.hs"
     ec1 <- liftIO $ system $ "cd " ++ td ++ " && " ++ hpath ++ " -b " ++ tfile
@@ -144,5 +144,10 @@ main = withTemporaryDirectory "/tmp/hscope_test_XXXXXX" $ \td -> testSimpleMain 
     res21 <- liftIO $ readProcess hpath [ "--build", "-f", td ++ "/foo.out"
                             , "t/files/Setup.lhs" ] ""
     is res21 $ ""
+
+    res22 <- liftIO $ readProcess hpath [ "-b", "-f", td ++ "/foo.out"
+                                    , "-I", "t/files/a", "-I", "t/files/b"
+                                    , "t/files/CPP3.hs" ] ""
+    is res22 ""
 
     return ()

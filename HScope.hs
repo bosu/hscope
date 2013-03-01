@@ -117,7 +117,7 @@ mapLines f to = reverse . snd . foldl' go ((to, True), []) where
     go t ('#':str) = let ((xs, _), res) = ret t in ((xs, isInfixOf f str), res)
     go t _ = ret t
     ret ((a@(x:xs), b), res) = ((if b then xs else a, b), x:res)
-    ret t = t
+    ret (([], _), res) = (([], False), (head res):res)
 
 preprocess :: [String] -> FilePath -> IO (String, Lines)
 preprocess idirs f = do
