@@ -3,9 +3,7 @@ module Main (main) where
 
 import System.Console.GetOpt
 import System.Environment (getArgs, getProgName)
-import Database.CDB.Write
-import Database.CDB.Read
-import Database.CDB.Packable
+import Database.PureCDB
 import Language.Haskell.Exts.Annotated
 import Control.Monad.Trans (liftIO)
 import Control.Monad (void, when)
@@ -20,6 +18,7 @@ import System.IO (hFlush, stdout)
 import Data.Generics.Uniplate.Data (transformBiM)
 import System.Directory (doesFileExist)
 import Data.Data
+import Data.Either (rights)
 import Language.Preprocessor.Cpphs (runCpphs, defaultCpphsOptions,  CpphsOptions(..)
             , defaultBoolOptions, BoolOptions(..))
 
@@ -44,9 +43,6 @@ instance Serialize Info where
     get = do
         ity <- fmap toEnum get
         Info ity <$> get <*> get <*> get
-
-instance Unpackable Info where
-    unpack = either error id . decode
 
 options :: [OptDescr Flag]
 options = [
@@ -78,8 +74,8 @@ parseFlags = foldl' go $ Config False "hscope.out" False Nothing [] [] where
     go c (CPPInclude i) = c { cCPPIncludes = i:(cCPPIncludes c) }
     go c (OExtension i) = c { cExtensions = i:(cExtensions c) }
 
-addInfo :: Lines -> IType -> Name SrcSpanInfo -> CDBMake
-addInfo vec ity n = cdbAdd f $ encode $ Info ity (fileName src) (fst lp) (snd lp)
+addInfo :: Lines -> IType -> Name SrcSpanInfo -> WriteCDB IO ()
+addInfo vec ity n = addBS (B.pack f) $ encode $ Info ity (fileName src) (fst lp) (snd lp)
     where l = startLine src
           lp = maybe (error $ "Bad line: " ++ show n ++ ", " ++ show vec) id $ vec V.!? (l - 2)
           (src, f) = case n of
@@ -89,18 +85,18 @@ addInfo vec ity n = cdbAdd f $ encode $ Info ity (fileName src) (fst lp) (snd lp
 traverseAST :: (Data b, Monad m, Data a, Functor m) => (a -> m ()) -> b -> m ()
 traverseAST cb = void . transformBiM go where go v = cb v >> return v
 
-handleDefinitions :: Lines -> Decl SrcSpanInfo -> CDBMake
+handleDefinitions :: Lines -> Decl SrcSpanInfo -> WriteCDB IO ()
 handleDefinitions vec = go where
     go (PatBind _ (PVar _ n) _ _ _) = addDef n
     go (FunBind _ ((Match _ n _ _ _):_)) = addDef n
     go _ = return ()
     addDef = addInfo vec Definition
 
-handleCalls :: Lines -> QName SrcSpanInfo -> CDBMake
+handleCalls :: Lines -> QName SrcSpanInfo -> WriteCDB IO ()
 handleCalls vec (UnQual _ n) = addInfo vec Call n
 handleCalls _ _ = return ()
 
-handleConstructors :: Lines -> ConDecl SrcSpanInfo -> CDBMake
+handleConstructors :: Lines -> ConDecl SrcSpanInfo -> WriteCDB IO ()
 handleConstructors vec (ConDecl _ n _) = addInfo vec Definition n
 handleConstructors vec (RecDecl _ n recs) = do
     addInfo vec Definition n
@@ -108,7 +104,7 @@ handleConstructors vec (RecDecl _ n recs) = do
     where go (FieldDecl _ ns _) = mapM_ (addInfo vec Definition) ns
 handleConstructors _ c = error $ "handleConstructors " ++ show c
 
-handleDeclarations :: Lines -> DeclHead SrcSpanInfo -> CDBMake
+handleDeclarations :: Lines -> DeclHead SrcSpanInfo -> WriteCDB IO ()
 handleDeclarations vec (DHead _ n _) = addInfo vec Definition n
 handleDeclarations _ c = error $ "handleDeclarations " ++ show c
 
@@ -141,9 +137,9 @@ parseCurrentFile f fstr exts = case parseFileContentsWithMode (pmode exts) fstr 
                             , extensions = exs
                             , parseFilename = f }
 
-buildOne :: Config -> FilePath -> CDBMake
+buildOne :: Config -> FilePath -> WriteCDB IO ()
 buildOne cfg f = do
-    cdbAdd "0_hs_files" f
+    addBS (B.pack "0_hs_files") (B.pack f)
     (fstr, lns) <- liftIO $ preprocess (cCPPIncludes cfg) f
     either (liftIO . putStrLn) (go lns) $ parseCurrentFile f fstr
         $ map classifyExtension $ cExtensions cfg
@@ -154,23 +150,23 @@ buildOne cfg f = do
                     traverseAST (handleDeclarations lns) modul
                     -- liftIO $ putStrLn $ show modul
 
-handleQuery :: CDB -> String -> IO ()
+handleQuery :: ReadCDB -> String -> IO ()
 handleQuery cdb ('1':str) = findInfo Definition cdb str
 handleQuery cdb ('3':str) = findInfo Call cdb str
 handleQuery cdb ('4':str) = do
-    let files = cdbGetAll cdb "0_hs_files"
+    files <- fmap (map B.unpack) $ getBS cdb (B.pack "0_hs_files")
     lns <- fmap lines $ readProcess "grep" ("-n":"-H":str:files) ""
     outputLines $ map go lns
     where go l = let (f, rest1) = break (':' ==) l
                      (n, rest2) = break (':' ==) $ drop 1 rest1
                   in f ++ " <unknown> " ++ n ++ " " ++ drop 1 rest2 
 handleQuery cdb ('7':str) = do
-    let files = cdbGetAll cdb "0_hs_files"
+    files <- fmap (map B.unpack) $ getBS cdb $ B.pack "0_hs_files"
     outputLines $ map go $ filter (isInfixOf str) files
     where go f = f ++ " <unknown> 1 <unknown>"
 handleQuery _ _ = return ()
 
-runLines :: CDB -> IO ()
+runLines :: ReadCDB -> IO ()
 runLines cdb = do
     putStr ">> "
     hFlush stdout
@@ -185,8 +181,10 @@ outputLines infos = do
     putStrLn $ "cscope: " ++ (show $ length infos) ++ " lines"
     mapM_ putStrLn infos
 
-findInfo :: IType -> CDB -> String -> IO ()
-findInfo ity cdb str = outputLines $ catMaybes $ map go $ cdbGetAll cdb str
+findInfo :: IType -> ReadCDB -> String -> IO ()
+findInfo ity cdb str = do
+    bses <- getBS cdb $ B.pack str
+    outputLines $ catMaybes $ map go $ rights $ map decode bses
     where go (Info t file lno line) | t == ity = Just $ file ++ " " ++ str
                                         ++ " " ++ show lno ++ " " ++ B.unpack line
                                     | otherwise = Nothing
@@ -197,7 +195,7 @@ main = do
     let cfg = parseFlags flags
     when (cBuild cfg) $ do
         if null rest then putStrLn $ "Please provide files to build the hscope database"
-                     else cdbMake (cFile cfg) $ mapM_ (buildOne cfg) rest
+                     else makeCDB (mapM_ (buildOne cfg) rest) (cFile cfg) 
     if null flags then usage else go cfg
     where usage = do
             pn <- getProgName
@@ -205,7 +203,7 @@ main = do
           go cfg = do
             b <- doesFileExist $ cFile cfg
             if b then do
-                    cdb <- cdbInit $ cFile cfg
+                    cdb <- openCDB $ cFile cfg
                     maybe (return ()) (handleQuery cdb) $ cQuery cfg
                     when (cLine cfg) $ runLines cdb
                  else putStrLn $ cFile cfg ++ " does not exist"

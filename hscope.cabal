@@ -1,5 +1,5 @@
 Name:           hscope
-Version:        0.2.2
+Version:        0.3
 License:        BSD3
 License-File:   COPYING
 Category:       source-tools
@@ -24,6 +24,7 @@ homepage:       https://github.com/bosu/hscope
 Stability:      Experimental
 Extra-Source-Files:
     t/files/Unbox.hs
+    t/files/CPP3.hs
     t/files/Simple.hs
     t/files/Setup.lhs
     t/files/Arrow.hs
@@ -34,12 +35,13 @@ Extra-Source-Files:
     t/files/b/b.h
     t/files/a.c
     t/files/garrs.hs
-    t/files/CPP.hs 
+    t/files/CPP.hs
+    README.md
 
 Executable hscope
     Main-Is: HScope.hs
     GHC-Options: -Wall
-    Build-Depends: base (< 5), hs-cdb, haskell-src-exts, mtl, uniplate, cereal
+    Build-Depends: base (< 5), pure-cdb, haskell-src-exts, mtl, uniplate, cereal
                              , vector, bytestring, process, directory, cpphs
     Default-Language: Haskell2010
 
