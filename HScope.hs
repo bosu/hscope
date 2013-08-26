@@ -5,7 +5,7 @@ import System.Console.GetOpt
 import System.Environment (getArgs, getProgName)
 import Database.PureCDB
 import Language.Haskell.Exts.Annotated
-import Control.Monad.Trans (liftIO)
+import Control.Monad.Trans (liftIO, MonadIO)
 import Control.Monad (void, when)
 import System.Process (readProcess)
 import Data.List (foldl', intercalate, isInfixOf)
@@ -14,7 +14,7 @@ import Data.Serialize
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Vector as V
 import Control.Applicative ((<$>), (<*>))
-import System.IO (hFlush, stdout)
+import System.IO (hFlush, hPutStrLn, stdout, stderr)
 import Data.Generics.Uniplate.Data (transformBiM)
 import System.Directory (doesFileExist)
 import Data.Data
@@ -102,11 +102,11 @@ handleConstructors vec (RecDecl _ n recs) = do
     addInfo vec Definition n
     mapM_ go recs
     where go (FieldDecl _ ns _) = mapM_ (addInfo vec Definition) ns
-handleConstructors _ c = error $ "handleConstructors " ++ show c
+handleConstructors _ c = warning $ "handleConstructors " ++ show c
 
 handleDeclarations :: Lines -> DeclHead SrcSpanInfo -> WriteCDB IO ()
 handleDeclarations vec (DHead _ n _) = addInfo vec Definition n
-handleDeclarations _ c = error $ "handleDeclarations " ++ show c
+handleDeclarations _ c = warning $ "handleDeclarations " ++ show c
 
 mapLines :: Show a => FilePath -> [a] -> [String] -> [a]
 mapLines f to = reverse . snd . foldl' go ((to, True), []) where
@@ -188,6 +188,9 @@ findInfo ity cdb str = do
     where go (Info t file lno line) | t == ity = Just $ file ++ " " ++ str
                                         ++ " " ++ show lno ++ " " ++ B.unpack line
                                     | otherwise = Nothing
+
+warning :: (MonadIO m) => String -> m ()
+warning msg = liftIO . hPutStrLn stderr $ "WARNING: " ++ msg
 
 main :: IO ()
 main = do
