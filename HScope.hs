@@ -75,9 +75,10 @@ parseFlags = foldl' go $ Config False "hscope.out" False Nothing [] [] where
     go c (OExtension i) = c { cExtensions = i:(cExtensions c) }
 
 addInfo :: Lines -> IType -> Name SrcSpanInfo -> WriteCDB IO ()
-addInfo vec ity n = addBS (B.pack f) $ encode $ Info ity (fileName src) (fst lp) (snd lp)
+addInfo vec ity n = case vec V.!? (l - 2) of
+    Nothing -> warning $ "Bad line: " ++ show n ++ ", " ++ show vec
+    Just lp -> addBS (B.pack f) $ encode $ Info ity (fileName src) (fst lp) (snd lp)
     where l = startLine src
-          lp = maybe (error $ "Bad line: " ++ show n ++ ", " ++ show vec) id $ vec V.!? (l - 2)
           (src, f) = case n of
             (Ident src' f') -> (src', f')
             (Symbol src' f') -> (src', f')
