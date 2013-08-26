@@ -103,11 +103,12 @@ handleConstructors vec (RecDecl _ n recs) = do
     addInfo vec Definition n
     mapM_ go recs
     where go (FieldDecl _ ns _) = mapM_ (addInfo vec Definition) ns
-handleConstructors _ c = warning $ "handleConstructors " ++ show c
+handleConstructors vec (InfixConDecl _ _ n _) = addInfo vec Definition n
 
 handleDeclarations :: Lines -> DeclHead SrcSpanInfo -> WriteCDB IO ()
 handleDeclarations vec (DHead _ n _) = addInfo vec Definition n
-handleDeclarations _ c = warning $ "handleDeclarations " ++ show c
+handleDeclarations vec (DHInfix _ _ n _) = addInfo vec Definition n
+handleDeclarations vec (DHParen _ declHead) = handleDeclarations vec declHead
 
 mapLines :: Show a => FilePath -> [a] -> [String] -> [a]
 mapLines f to = reverse . snd . foldl' go ((to, True), []) where
