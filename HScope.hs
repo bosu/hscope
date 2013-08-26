@@ -5,7 +5,7 @@ import System.Console.GetOpt
 import System.Environment (getArgs, getProgName)
 import Database.PureCDB
 import Language.Haskell.Exts.Annotated
-import Control.Monad.Trans (liftIO)
+import Control.Monad.Trans (liftIO, MonadIO)
 import Control.Monad (void, when)
 import System.Process (readProcess)
 import Data.List (foldl', intercalate, isInfixOf)
@@ -14,7 +14,7 @@ import Data.Serialize
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Vector as V
 import Control.Applicative ((<$>), (<*>))
-import System.IO (hFlush, stdout)
+import System.IO (BufferMode (..), hSetBuffering, hFlush, hPutStrLn, stdout, stderr)
 import Data.Generics.Uniplate.Data (transformBiM)
 import System.Directory (doesFileExist)
 import Data.Data
@@ -75,9 +75,10 @@ parseFlags = foldl' go $ Config False "hscope.out" False Nothing [] [] where
     go c (OExtension i) = c { cExtensions = i:(cExtensions c) }
 
 addInfo :: Lines -> IType -> Name SrcSpanInfo -> WriteCDB IO ()
-addInfo vec ity n = addBS (B.pack f) $ encode $ Info ity (fileName src) (fst lp) (snd lp)
+addInfo vec ity n = case vec V.!? (l - 2) of
+    Nothing -> warning $ "Bad line: " ++ show n ++ ", " ++ show vec
+    Just lp -> addBS (B.pack f) $ encode $ Info ity (fileName src) (fst lp) (snd lp)
     where l = startLine src
-          lp = maybe (error $ "Bad line: " ++ show n ++ ", " ++ show vec) id $ vec V.!? (l - 2)
           (src, f) = case n of
             (Ident src' f') -> (src', f')
             (Symbol src' f') -> (src', f')
@@ -102,11 +103,12 @@ handleConstructors vec (RecDecl _ n recs) = do
     addInfo vec Definition n
     mapM_ go recs
     where go (FieldDecl _ ns _) = mapM_ (addInfo vec Definition) ns
-handleConstructors _ c = error $ "handleConstructors " ++ show c
+handleConstructors vec (InfixConDecl _ _ n _) = addInfo vec Definition n
 
 handleDeclarations :: Lines -> DeclHead SrcSpanInfo -> WriteCDB IO ()
 handleDeclarations vec (DHead _ n _) = addInfo vec Definition n
-handleDeclarations _ c = error $ "handleDeclarations " ++ show c
+handleDeclarations vec (DHInfix _ _ n _) = addInfo vec Definition n
+handleDeclarations vec (DHParen _ declHead) = handleDeclarations vec declHead
 
 mapLines :: Show a => FilePath -> [a] -> [String] -> [a]
 mapLines f to = reverse . snd . foldl' go ((to, True), []) where
@@ -189,8 +191,14 @@ findInfo ity cdb str = do
                                         ++ " " ++ show lno ++ " " ++ B.unpack line
                                     | otherwise = Nothing
 
+warning :: (MonadIO m) => String -> m ()
+warning msg = liftIO . hPutStrLn stderr $ "WARNING: " ++ msg
+
 main :: IO ()
 main = do
+    -- Always set to line buffering
+    hSetBuffering stdout LineBuffering
+
     (flags, rest, _) <- fmap (getOpt Permute options) getArgs
     let cfg = parseFlags flags
     when (cBuild cfg) $ do
