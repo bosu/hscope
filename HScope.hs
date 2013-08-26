@@ -14,7 +14,7 @@ import Data.Serialize
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Vector as V
 import Control.Applicative ((<$>), (<*>))
-import System.IO (hFlush, hPutStrLn, stdout, stderr)
+import System.IO (BufferMode (..), hSetBuffering, hFlush, hPutStrLn, stdout, stderr)
 import Data.Generics.Uniplate.Data (transformBiM)
 import System.Directory (doesFileExist)
 import Data.Data
@@ -196,6 +196,9 @@ warning msg = liftIO . hPutStrLn stderr $ "WARNING: " ++ msg
 
 main :: IO ()
 main = do
+    -- Always set to line buffering
+    hSetBuffering stdout LineBuffering
+
     (flags, rest, _) <- fmap (getOpt Permute options) getArgs
     let cfg = parseFlags flags
     when (cBuild cfg) $ do
