@@ -149,9 +149,13 @@ preprocess idirs f = do
 parseCurrentFile :: FilePath -> String -> [Extension] -> Either String (Module SrcSpanInfo)
 parseCurrentFile f fstr exts = case parseFileContentsWithMode (pmode exts) fstr of
         ParseOk m -> Right m
-        ParseFailed src str -> let (ext, rest) = break (== ' ') str
-                in if rest == " is not enabled"
-                   then parseCurrentFile f fstr ((classifyExtension ext):exts)
+        ParseFailed src str -> let (extStr, rest) = break (== ' ') str
+                                   ext            = classifyExtension extStr
+                -- Make sure to check if the extension is already enabled because
+                -- a file can use a No... LANGUAGE pragma in which case we would do this
+                -- infinitely often.
+                in if rest == " is not enabled" && ext `notElem` exts
+                   then parseCurrentFile f fstr (ext:exts)
                    else Left $ str ++ " for " ++ f ++ " at " ++ show src ++ " with " ++ show exts
     where pmode exs = defaultParseMode { fixities = Just []
                             , extensions = exs
