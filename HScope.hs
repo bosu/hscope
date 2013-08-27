@@ -117,7 +117,7 @@ mapLines f to = reverse . snd . foldl' go ((to, True), []) where
     go t ('#':str) = let ((xs, _), res) = ret t in ((xs, isInfixOf f str), res)
     go t _ = ret t
     ret ((a@(x:xs), b), res) = ((if b then xs else a, b), x:res)
-    ret (([], _), res) = (([], False), (head res):res)
+    ret (([], _), res) = (([], False), (head res):res) -- TODO explain why head is safe here?
 
 -- `runCpphs` calls `error` when an #error directive is encountered.
 -- This would terminate our program; this function catches that.
