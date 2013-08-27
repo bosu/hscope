@@ -25,11 +25,13 @@ import Language.Preprocessor.Cpphs (runCpphs, defaultCpphsOptions,  CpphsOptions
             , defaultBoolOptions, BoolOptions(..))
 
 data Flag = Build Bool | File FilePath | Line | Query String
-                | CPPInclude String | OExtension String deriving (Show)
+                | CPPInclude String | OExtension String | Verbose
+          deriving (Show)
 
 data Config = Config { cBuild :: Bool, cFile :: FilePath, cLine :: Bool
                         , cQuery :: Maybe String, cCPPIncludes :: [String]
-                        , cExtensions :: [String] } deriving Show
+                        , cExtensions :: [String]
+                        , verbose :: Bool } deriving Show
 
 data IType = Definition | Call deriving (Enum, Show, Eq)
 data Info = Info IType String Int B.ByteString deriving Show
@@ -65,16 +67,18 @@ options = [
             , Option ['I'] [ "cpp-include" ] (ReqArg CPPInclude "DIRECTORY")
                     $ "Include path for CPP preprocessor"
             , Option ['X'] [ "extension" ] (ReqArg OExtension "EXTENSION") $ "Add GHC extension"
+            , Option ['v'] [ "verbose" ] (NoArg $ Verbose) "Verbose output"
           ]
 
 parseFlags :: [Flag] -> Config
-parseFlags = foldl' go $ Config False "hscope.out" False Nothing [] [] where
+parseFlags = foldl' go $ Config False "hscope.out" False Nothing [] [] False where
     go c (Build b) = c { cBuild = b }
     go c (File f) = c { cFile = f }
     go c Line = c { cLine = True }
     go c (Query q) = c { cQuery = Just q }
     go c (CPPInclude i) = c { cCPPIncludes = i:(cCPPIncludes c) }
     go c (OExtension i) = c { cExtensions = i:(cExtensions c) }
+    go c Verbose = c { verbose = True }
 
 addInfo :: Lines -> IType -> Name SrcSpanInfo -> WriteCDB IO ()
 addInfo vec ity n = case vec V.!? (l - 2) of
@@ -155,6 +159,8 @@ parseCurrentFile f fstr exts = case parseFileContentsWithMode (pmode exts) fstr 
 
 buildOne :: Config -> FilePath -> WriteCDB IO ()
 buildOne cfg f = do
+    when (verbose cfg) $
+        liftIO $ putStrLn $ "Processing " ++ f
     addBS (B.pack "0_hs_files") (B.pack f)
     e'preprocessed <- liftIO $ preprocess (cCPPIncludes cfg) f
     case e'preprocessed of
