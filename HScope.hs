@@ -5,6 +5,8 @@ import System.Console.GetOpt
 import System.Environment (getArgs, getProgName)
 import Database.PureCDB
 import Language.Haskell.Exts.Annotated
+import Control.Exception
+import Control.DeepSeq (($!!))
 import Control.Monad.Trans (liftIO, MonadIO)
 import Control.Monad (void, when)
 import System.Process (readProcess)
@@ -117,16 +119,28 @@ mapLines f to = reverse . snd . foldl' go ((to, True), []) where
     ret ((a@(x:xs), b), res) = ((if b then xs else a, b), x:res)
     ret (([], _), res) = (([], False), (head res):res)
 
-preprocess :: [String] -> FilePath -> IO (String, Lines)
+-- `runCpphs` calls `error` when an #error directive is encountered.
+-- This would terminate our program; this function catches that.
+safeCpphs :: CpphsOptions -> FilePath -> String -> IO (Either String String)
+safeCpphs opts filename input = do
+    res <- try $ (evaluate $!!) =<< runCpphs opts filename input
+    return $ case res of
+        Left (ErrorCall e) -> Left e
+        Right cppOutput    -> Right cppOutput
+
+preprocess :: [String] -> FilePath -> IO (Either String (String, Lines))
 preprocess idirs f = do
     rf <- B.readFile f
-    flns <- fmap lines $ runCpphs cpphsOpts f $ B.unpack rf
-    return (fconts flns, V.fromList $ mapLines f (zip [1 ..] $ B.lines rf) flns)
+    e'cppOutput <- safeCpphs cpphsOpts f $ B.unpack rf
+    let processCppOutput flns = ( fconts flns
+                                , V.fromList $ mapLines f (zip [1 ..] $ B.lines rf) flns)
+    return $ (processCppOutput . lines) `fmap` e'cppOutput
     where fconts = intercalate "\n" . map cmnt
           cmnt ('#':_) = ""
           cmnt x = x
           cpphsOpts = defaultCpphsOptions { includes = idirs, boolopts = bools }
           bools = defaultBoolOptions { stripC89 = True, stripEol = True }
+
 
 parseCurrentFile :: FilePath -> String -> [Extension] -> Either String (Module SrcSpanInfo)
 parseCurrentFile f fstr exts = case parseFileContentsWithMode (pmode exts) fstr of
@@ -142,9 +156,11 @@ parseCurrentFile f fstr exts = case parseFileContentsWithMode (pmode exts) fstr 
 buildOne :: Config -> FilePath -> WriteCDB IO ()
 buildOne cfg f = do
     addBS (B.pack "0_hs_files") (B.pack f)
-    (fstr, lns) <- liftIO $ preprocess (cCPPIncludes cfg) f
-    either (liftIO . putStrLn) (go lns) $ parseCurrentFile f fstr
-        $ map classifyExtension $ cExtensions cfg
+    e'preprocessed <- liftIO $ preprocess (cCPPIncludes cfg) f
+    case e'preprocessed of
+        Left cppErr       -> warning $ "CPP error: " ++ cppErr
+        Right (fstr, lns) -> either (liftIO . putStrLn) (go lns) $
+                               parseCurrentFile f fstr (map classifyExtension $ cExtensions cfg)
     where go lns modul = do
                     traverseAST (handleDefinitions lns) modul
                     traverseAST (handleCalls lns) modul
