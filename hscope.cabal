@@ -42,7 +42,9 @@ Executable hscope
     Main-Is: HScope.hs
     GHC-Options: -Wall
     -- uniplate >= 1.6.11 to avoid 10x performance regression
-    Build-Depends: base (< 5), pure-cdb, haskell-src-exts, mtl, uniplate >= 1.6.11, cereal
+    -- uniplate 1.6.6 is what Ubuntu 12.04 has in its packages. To be removed eventually...
+    Build-Depends: base (< 5), pure-cdb, haskell-src-exts, mtl
+                             , uniplate >= 1.6.11 || == 1.6.6, cereal
                              , vector, bytestring, process, deepseq, directory, cpphs
     Default-Language: Haskell2010
 
