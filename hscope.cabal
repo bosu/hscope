@@ -41,8 +41,9 @@ Extra-Source-Files:
 Executable hscope
     Main-Is: HScope.hs
     GHC-Options: -Wall
-    Build-Depends: base (< 5), pure-cdb, haskell-src-exts, mtl, uniplate, cereal
-                             , vector, bytestring, process, directory, cpphs
+    -- uniplate >= 1.6.11 to avoid 10x performance regression
+    Build-Depends: base (< 5), pure-cdb, haskell-src-exts, mtl, uniplate >= 1.6.11, cereal
+                             , vector, bytestring, process, deepseq, directory, cpphs
     Default-Language: Haskell2010
 
 test-suite Build

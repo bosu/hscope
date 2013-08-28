@@ -5,6 +5,8 @@ import System.Console.GetOpt
 import System.Environment (getArgs, getProgName)
 import Database.PureCDB
 import Language.Haskell.Exts.Annotated
+import Control.Exception
+import Control.DeepSeq (($!!))
 import Control.Monad.Trans (liftIO, MonadIO)
 import Control.Monad (void, when)
 import System.Process (readProcess)
@@ -23,11 +25,13 @@ import Language.Preprocessor.Cpphs (runCpphs, defaultCpphsOptions,  CpphsOptions
             , defaultBoolOptions, BoolOptions(..))
 
 data Flag = Build Bool | File FilePath | Line | Query String
-                | CPPInclude String | OExtension String deriving (Show)
+                | CPPInclude String | OExtension String | Verbose
+          deriving (Show)
 
 data Config = Config { cBuild :: Bool, cFile :: FilePath, cLine :: Bool
                         , cQuery :: Maybe String, cCPPIncludes :: [String]
-                        , cExtensions :: [String] } deriving Show
+                        , cExtensions :: [String]
+                        , verbose :: Bool } deriving Show
 
 data IType = Definition | Call deriving (Enum, Show, Eq)
 data Info = Info IType String Int B.ByteString deriving Show
@@ -63,16 +67,18 @@ options = [
             , Option ['I'] [ "cpp-include" ] (ReqArg CPPInclude "DIRECTORY")
                     $ "Include path for CPP preprocessor"
             , Option ['X'] [ "extension" ] (ReqArg OExtension "EXTENSION") $ "Add GHC extension"
+            , Option ['v'] [ "verbose" ] (NoArg $ Verbose) "Verbose output"
           ]
 
 parseFlags :: [Flag] -> Config
-parseFlags = foldl' go $ Config False "hscope.out" False Nothing [] [] where
+parseFlags = foldl' go $ Config False "hscope.out" False Nothing [] [] False where
     go c (Build b) = c { cBuild = b }
     go c (File f) = c { cFile = f }
     go c Line = c { cLine = True }
     go c (Query q) = c { cQuery = Just q }
     go c (CPPInclude i) = c { cCPPIncludes = i:(cCPPIncludes c) }
     go c (OExtension i) = c { cExtensions = i:(cExtensions c) }
+    go c Verbose = c { verbose = True }
 
 addInfo :: Lines -> IType -> Name SrcSpanInfo -> WriteCDB IO ()
 addInfo vec ity n = case vec V.!? (l - 2) of
@@ -115,25 +121,41 @@ mapLines f to = reverse . snd . foldl' go ((to, True), []) where
     go t ('#':str) = let ((xs, _), res) = ret t in ((xs, isInfixOf f str), res)
     go t _ = ret t
     ret ((a@(x:xs), b), res) = ((if b then xs else a, b), x:res)
-    ret (([], _), res) = (([], False), (head res):res)
+    ret (([], _), res) = (([], False), (head res):res) -- TODO explain why head is safe here?
 
-preprocess :: [String] -> FilePath -> IO (String, Lines)
+-- `runCpphs` calls `error` when an #error directive is encountered.
+-- This would terminate our program; this function catches that.
+safeCpphs :: CpphsOptions -> FilePath -> String -> IO (Either String String)
+safeCpphs opts filename input = do
+    res <- try $ (evaluate $!!) =<< runCpphs opts filename input
+    return $ case res of
+        Left (ErrorCall e) -> Left e
+        Right cppOutput    -> Right cppOutput
+
+preprocess :: [String] -> FilePath -> IO (Either String (String, Lines))
 preprocess idirs f = do
     rf <- B.readFile f
-    flns <- fmap lines $ runCpphs cpphsOpts f $ B.unpack rf
-    return (fconts flns, V.fromList $ mapLines f (zip [1 ..] $ B.lines rf) flns)
+    e'cppOutput <- safeCpphs cpphsOpts f $ B.unpack rf
+    let processCppOutput flns = ( fconts flns
+                                , V.fromList $ mapLines f (zip [1 ..] $ B.lines rf) flns)
+    return $ (processCppOutput . lines) `fmap` e'cppOutput
     where fconts = intercalate "\n" . map cmnt
           cmnt ('#':_) = ""
           cmnt x = x
           cpphsOpts = defaultCpphsOptions { includes = idirs, boolopts = bools }
           bools = defaultBoolOptions { stripC89 = True, stripEol = True }
 
+
 parseCurrentFile :: FilePath -> String -> [Extension] -> Either String (Module SrcSpanInfo)
 parseCurrentFile f fstr exts = case parseFileContentsWithMode (pmode exts) fstr of
         ParseOk m -> Right m
-        ParseFailed src str -> let (ext, rest) = break (== ' ') str
-                in if rest == " is not enabled"
-                   then parseCurrentFile f fstr ((classifyExtension ext):exts)
+        ParseFailed src str -> let (extStr, rest) = break (== ' ') str
+                                   ext            = classifyExtension extStr
+                -- Make sure to check if the extension is already enabled because
+                -- a file can use a No... LANGUAGE pragma in which case we would do this
+                -- infinitely often.
+                in if rest == " is not enabled" && ext `notElem` exts
+                   then parseCurrentFile f fstr (ext:exts)
                    else Left $ str ++ " for " ++ f ++ " at " ++ show src ++ " with " ++ show exts
     where pmode exs = defaultParseMode { fixities = Just []
                             , extensions = exs
@@ -141,10 +163,14 @@ parseCurrentFile f fstr exts = case parseFileContentsWithMode (pmode exts) fstr 
 
 buildOne :: Config -> FilePath -> WriteCDB IO ()
 buildOne cfg f = do
+    when (verbose cfg) $
+        liftIO $ putStrLn $ "Processing " ++ f
     addBS (B.pack "0_hs_files") (B.pack f)
-    (fstr, lns) <- liftIO $ preprocess (cCPPIncludes cfg) f
-    either (liftIO . putStrLn) (go lns) $ parseCurrentFile f fstr
-        $ map classifyExtension $ cExtensions cfg
+    e'preprocessed <- liftIO $ preprocess (cCPPIncludes cfg) f
+    case e'preprocessed of
+        Left cppErr       -> warning $ "CPP error: " ++ cppErr
+        Right (fstr, lns) -> either (liftIO . putStrLn) (go lns) $
+                               parseCurrentFile f fstr (map classifyExtension $ cExtensions cfg)
     where go lns modul = do
                     traverseAST (handleDefinitions lns) modul
                     traverseAST (handleCalls lns) modul
