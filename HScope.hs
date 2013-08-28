@@ -116,7 +116,7 @@ handleDeclarations vec (DHead _ n _) = addInfo vec Definition n
 handleDeclarations vec (DHInfix _ _ n _) = addInfo vec Definition n
 handleDeclarations vec (DHParen _ declHead) = handleDeclarations vec declHead
 
-mapLines :: Show a => FilePath -> [a] -> [String] -> [a]
+mapLines :: FilePath -> [a] -> [String] -> [a]
 mapLines f to = reverse . snd . foldl' go ((to, True), []) where
     go t ('#':str) = let ((xs, _), res) = ret t in ((xs, isInfixOf f str), res)
     go t _ = ret t
