@@ -1,5 +1,5 @@
 Name:           hscope
-Version:        0.4
+Version:        0.4.1
 License:        BSD3
 License-File:   COPYING
 Category:       source-tools
@@ -41,10 +41,8 @@ Extra-Source-Files:
 Executable hscope
     Main-Is: HScope.hs
     GHC-Options: -Wall
-    -- uniplate >= 1.6.11 to avoid 10x performance regression
-    -- uniplate 1.6.6 is what Ubuntu 12.04 has in its packages. To be removed eventually...
-    Build-Depends: base (< 5), pure-cdb, haskell-src-exts, mtl
-                             , uniplate >= 1.6.11 || == 1.6.6, cereal
+    Build-Depends: base == 4.7.*, haskell-src-exts == 1.16.*, mtl, pure-cdb
+                             , uniplate >= 1.6.12 && < 1.7, cereal
                              , vector, bytestring, process, deepseq, directory, cpphs
     Default-Language: Haskell2010
 

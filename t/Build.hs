@@ -23,25 +23,11 @@ hscopeInteract hpath td cmds = do
 
 main :: IO ()
 main = withTemporaryDirectory "/tmp/hscope_test_XXXXXX" $ \td -> testSimpleMain $ do
-    plan 48
+    plan 43
     hpath <- liftIO $ canonicalizePath "./dist/build/hscope/hscope"
     tfile <- liftIO $ canonicalizePath "./t/files/Simple.hs"
     ec1 <- liftIO $ system $ "cd " ++ td ++ " && " ++ hpath ++ " -b " ++ tfile
-    res1 <- liftIO $ readProcess "cdb" [ "-l", td ++ "/hscope.out" ] ""
     is ec1 ExitSuccess
-    like res1 "main"
-
-    res2 <- liftIO $ readProcess "cdb" [ "-q", td ++ "/hscope.out", "main" ] ""
-    like res2 "main = "
-
-    res3 <- liftIO $ readProcess "cdb" [ "-q", td ++ "/hscope.out", "findInfo" ] ""
-    like res3 "-> findInfo "
-
-    res4 <- liftIO $ readProcess "cdb" [ "-q", td ++ "/hscope.out", "options" ] ""
-    like res4 "Permute options"
-
-    res5 <- liftIO $ readProcess "cdb" [ "-q", td ++ "/hscope.out", "runLines" ] ""
-    like res5 ">>= runLines"
 
     (ec2, l1) <- liftIO $ hscopeInteract hpath td [ "1main", "1findInfo" ]
     is ec2 ExitSuccess

@@ -94,7 +94,7 @@ traverseAST cb = void . transformBiM go where go v = cb v >> return v
 
 handleDefinitions :: Lines -> Decl SrcSpanInfo -> WriteCDB IO ()
 handleDefinitions vec = go where
-    go (PatBind _ (PVar _ n) _ _ _) = addDef n
+    go (PatBind _ (PVar _ n) _ _) = addDef n
     go (FunBind _ ((Match _ n _ _ _):_)) = addDef n
     go _ = return ()
     addDef = addInfo vec Definition
@@ -112,9 +112,10 @@ handleConstructors vec (RecDecl _ n recs) = do
 handleConstructors vec (InfixConDecl _ _ n _) = addInfo vec Definition n
 
 handleDeclarations :: Lines -> DeclHead SrcSpanInfo -> WriteCDB IO ()
-handleDeclarations vec (DHead _ n _) = addInfo vec Definition n
-handleDeclarations vec (DHInfix _ _ n _) = addInfo vec Definition n
+handleDeclarations vec (DHead _ n) = addInfo vec Definition n
+handleDeclarations vec (DHInfix _ _ n) = addInfo vec Definition n
 handleDeclarations vec (DHParen _ declHead) = handleDeclarations vec declHead
+handleDeclarations vec (DHApp _ declHead _) = handleDeclarations vec declHead
 
 mapLines :: FilePath -> [a] -> [String] -> [a]
 mapLines f to = reverse . snd . foldl' go ((to, True), []) where
