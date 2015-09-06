@@ -41,7 +41,8 @@ Extra-Source-Files:
 Executable hscope
     Main-Is: HScope.hs
     GHC-Options: -Wall
-    Build-Depends: base == 4.7.*, haskell-src-exts == 1.16.*, mtl, pure-cdb
+    Build-Depends: base >= 4.7 && < 4.9
+                             , haskell-src-exts == 1.16.*, mtl, pure-cdb
                              , uniplate >= 1.6.12 && < 1.7, cereal
                              , vector, bytestring, process, deepseq, directory, cpphs
     Default-Language: Haskell2010
