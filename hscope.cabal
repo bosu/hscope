@@ -1,5 +1,5 @@
 Name:           hscope
-Version:        0.4.1
+Version:        0.4.2
 License:        BSD3
 License-File:   COPYING
 Category:       source-tools
@@ -55,3 +55,6 @@ test-suite Build
     main-is:         Build.hs
     Default-Language: Haskell2010
 
+Source-Repository head
+    Type: git
+    Location: https://github.com/bosu/hscope
