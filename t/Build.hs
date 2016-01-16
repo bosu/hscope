@@ -55,7 +55,7 @@ main = withTemporaryDirectory "/tmp/hscope_test_XXXXXX" $ \td -> testSimpleMain 
     like l4 "parseFlags ::"
     like l4 "groupBy (==)"
 
-    res6 <- liftIO $ readProcess hpath [ "-b", "-f", td ++ "/foo.out", "t/files/a.c" ] ""
+    res6 <- liftIO $ readProcess hpath [ "-b", "-f", td ++ "/foo.out", "-X", "NamedFieldPuns", "t/files/a.c" ] ""
     like res6 "Parse error: 0"
     like res6 "a.c"
 
