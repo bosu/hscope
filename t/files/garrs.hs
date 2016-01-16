@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 data G a where
     A :: a -> G Int
     B :: b -> G Bool
