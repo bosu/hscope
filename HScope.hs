@@ -4,7 +4,7 @@ module Main (main) where
 import System.Console.GetOpt
 import System.Environment (getArgs, getProgName)
 import Database.PureCDB
-import Language.Haskell.Exts.Annotated
+import Language.Haskell.Exts
 import Control.Exception
 import Control.DeepSeq (($!!))
 import Control.Monad.Trans (liftIO, MonadIO)
